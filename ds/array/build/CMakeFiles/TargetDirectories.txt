@@ -1,0 +1,3 @@
+/home/nyk/tools/code/ds/array/build/CMakeFiles/thread_safe_array_demo.dir
+/home/nyk/tools/code/ds/array/build/CMakeFiles/edit_cache.dir
+/home/nyk/tools/code/ds/array/build/CMakeFiles/rebuild_cache.dir

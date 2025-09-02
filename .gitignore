@@ -1,0 +1,36 @@
+# CMake build and generated files
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.o
+*.obj
+*.so
+*.a
+*.exe
+*.out
+*.log
+*.d
+*.dSYM/
+# VSCode
+.vscode/
+# User/OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+# Backup
+*~
+# Python cache
+__pycache__/
+# Ignore all in ds/array/build
+/ds/array/build/
+# Ignore all in ds/array/CMakeFiles
+/ds/array/CMakeFiles/
+# Ignore all in ds/array/cmake_install.cmake
+/ds/array/cmake_install.cmake
+# Ignore all in ds/array/CMakeCache.txt
+/ds/array/CMakeCache.txt
+# Ignore all in ds/array/Makefile
+/ds/array/Makefile

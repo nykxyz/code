@@ -1,7 +1,7 @@
 // 适用于极致性能场景的自旋锁实现
 #include <atomic>
 #include <thread>
-
+#include <mutex>
 class SpinLock {
     std::atomic_flag flag = ATOMIC_FLAG_INIT;
 public:

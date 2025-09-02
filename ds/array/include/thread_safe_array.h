@@ -1,71 +1,10 @@
-public:
-    // 批量插入，减少锁竞争
-    template<std::ranges::input_range R>
-    void insert_range(const R& range) {
-        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
-            data_.insert(data_.end(), std::ranges::begin(range), std::ranges::end(range));
-        } else {
-            UniqueLock lock(mutex_);
-            data_.insert(data_.end(), std::ranges::begin(range), std::ranges::end(range));
-        }
-    }
-
-    // 批量删除（移除区间）
-    void erase_range(size_t first, size_t last) {
-        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
-            if (first < last && last <= data_.size()) {
-                data_.erase(data_.begin() + first, data_.begin() + last);
-            }
-        } else {
-            UniqueLock lock(mutex_);
-            if (first < last && last <= data_.size()) {
-                data_.erase(data_.begin() + first, data_.begin() + last);
-            }
-        }
-    }
-
-    // 非阻塞插入，极致性能场景
-    template<typename U = T>
-    bool try_push_back(U&& value) requires std::constructible_from<T, U&&> {
-        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
-            data_.push_back(std::forward<U>(value));
-            return true;
-        } else {
-            UniqueLock lock(mutex_, std::try_to_lock);
-            if (lock.owns_lock()) {
-                data_.push_back(std::forward<U>(value));
-                return true;
-            }
-            return false;
-        }
-    }
-
-    // 非阻塞原地构造
-    template<typename... Args>
-    bool try_emplace_back(Args&&... args) {
-        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
-            data_.emplace_back(std::forward<Args>(args)...);
-            return true;
-        } else {
-            UniqueLock lock(mutex_, std::try_to_lock);
-            if (lock.owns_lock()) {
-                data_.emplace_back(std::forward<Args>(args)...);
-                return true;
-            }
-            return false;
-        }
-    }
-
-    // 仅在用户保证安全时暴露底层数据指针
-    T* unsafe_data() noexcept { return data_.data(); }
-    const T* unsafe_data() const noexcept { return data_.data(); }
 #ifndef THREAD_SAFE_ARRAY_H
 #define THREAD_SAFE_ARRAY_H
 
 #include <vector>
 #include <shared_mutex>
 #include <type_traits>
-#include "thread_safe_lock.h"
+#include "../../lock/thread_safe_lock.h"
 template<typename T, typename Mutex = std::shared_mutex>
 class ThreadSafeArray {
     using UniqueLock = std::unique_lock<Mutex>;

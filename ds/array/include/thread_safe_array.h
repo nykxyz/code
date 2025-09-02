@@ -1,54 +1,135 @@
-    // C++23: constexpr 构造与常量表达式支持
-    constexpr ThreadSafeArray(const ThreadSafeArray&) = default;
-    constexpr ThreadSafeArray(ThreadSafeArray&&) = default;
-    constexpr ThreadSafeArray& operator=(const ThreadSafeArray&) = default;
-    constexpr ThreadSafeArray& operator=(ThreadSafeArray&&) = default;
-
-    // C++23: contains
-    bool contains(const T& value) const {
-        return find(value) != npos;
+public:
+    // 批量插入，减少锁竞争
+    template<std::ranges::input_range R>
+    void insert_range(const R& range) {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            data_.insert(data_.end(), std::ranges::begin(range), std::ranges::end(range));
+        } else {
+            UniqueLock lock(mutex_);
+            data_.insert(data_.end(), std::ranges::begin(range), std::ranges::end(range));
+        }
     }
 
-    // C++23: shrink_to_fit
-    void shrink_to_fit() {
-        UniqueLock lock(mutex_);
-        data_.shrink_to_fit();
+    // 批量删除（移除区间）
+    void erase_range(size_t first, size_t last) {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            if (first < last && last <= data_.size()) {
+                data_.erase(data_.begin() + first, data_.begin() + last);
+            }
+        } else {
+            UniqueLock lock(mutex_);
+            if (first < last && last <= data_.size()) {
+                data_.erase(data_.begin() + first, data_.begin() + last);
+            }
+        }
     }
 
-    // C++23: at (带越界检查)
-    T at(size_t index) const {
-        SharedLock lock(mutex_);
-        return data_.at(index);
+    // 非阻塞插入，极致性能场景
+    template<typename U = T>
+    bool try_push_back(U&& value) requires std::constructible_from<T, U&&> {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            data_.push_back(std::forward<U>(value));
+            return true;
+        } else {
+            UniqueLock lock(mutex_, std::try_to_lock);
+            if (lock.owns_lock()) {
+                data_.push_back(std::forward<U>(value));
+                return true;
+            }
+            return false;
+        }
     }
 
-    // C++23: cbegin/cend 只读迭代器
-    auto cbegin() const {
-        SharedLock lock(mutex_);
-        return data_.cbegin();
-    }
-    auto cend() const {
-        SharedLock lock(mutex_);
-        return data_.cend();
+    // 非阻塞原地构造
+    template<typename... Args>
+    bool try_emplace_back(Args&&... args) {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            data_.emplace_back(std::forward<Args>(args)...);
+            return true;
+        } else {
+            UniqueLock lock(mutex_, std::try_to_lock);
+            if (lock.owns_lock()) {
+                data_.emplace_back(std::forward<Args>(args)...);
+                return true;
+            }
+            return false;
+        }
     }
 
-    // C++23: 支持范围for循环（只读）
-    auto begin() const { return cbegin(); }
-    auto end() const { return cend(); }
-// 支持自定义锁策略，默认线程安全为 std::shared_mutex，非线程安全为 NullSharedMutex
+    // 仅在用户保证安全时暴露底层数据指针
+    T* unsafe_data() noexcept { return data_.data(); }
+    const T* unsafe_data() const noexcept { return data_.data(); }
 #ifndef THREAD_SAFE_ARRAY_H
 #define THREAD_SAFE_ARRAY_H
 
 #include <vector>
 #include <shared_mutex>
 #include <type_traits>
-
-
 #include "thread_safe_lock.h"
-
 template<typename T, typename Mutex = std::shared_mutex>
 class ThreadSafeArray {
     using UniqueLock = std::unique_lock<Mutex>;
     using SharedLock = std::shared_lock<Mutex>;
+    public:
+
+    template<std::ranges::input_range R>
+    void insert_range(const R& range) {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            data_.insert(data_.end(), std::ranges::begin(range), std::ranges::end(range));
+        } else {
+            UniqueLock lock(mutex_);
+            data_.insert(data_.end(), std::ranges::begin(range), std::ranges::end(range));
+        }
+    }
+
+    // 批量删除（移除区间）
+    void erase_range(size_t first, size_t last) {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            if (first < last && last <= data_.size()) {
+                data_.erase(data_.begin() + first, data_.begin() + last);
+            }
+        } else {
+            UniqueLock lock(mutex_);
+            if (first < last && last <= data_.size()) {
+                data_.erase(data_.begin() + first, data_.begin() + last);
+            }
+        }
+    }
+
+    // 非阻塞插入，极致性能场景
+    template<typename U = T>
+    bool try_push_back(U&& value) requires std::constructible_from<T, U&&> {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            data_.push_back(std::forward<U>(value));
+            return true;
+        } else {
+            UniqueLock lock(mutex_, std::try_to_lock);
+            if (lock.owns_lock()) {
+                data_.push_back(std::forward<U>(value));
+                return true;
+            }
+            return false;
+        }
+    }
+
+    // 非阻塞原地构造
+    template<typename... Args>
+    bool try_emplace_back(Args&&... args) {
+        if constexpr (std::is_same_v<Mutex, NullSharedMutex>) {
+            data_.emplace_back(std::forward<Args>(args)...);
+            return true;
+        } else {
+            UniqueLock lock(mutex_, std::try_to_lock);
+            if (lock.owns_lock()) {
+                data_.emplace_back(std::forward<Args>(args)...);
+                return true;
+            }
+            return false;
+        }
+    }
+
+    T* unsafe_data() noexcept { return data_.data(); }
+    const T* unsafe_data() const noexcept { return data_.data(); }
 public:
     ThreadSafeArray() = default;
     // 支持左值和右值，完美转发

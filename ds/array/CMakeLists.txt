@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
     # 添加优化选项
-    add_compile_options(-O2)
+    add_compile_options(-O3)
     # 如果需要调试，可以使用以下选项
     # add_compile_options(-g -O0)
 elseif(MSVC)

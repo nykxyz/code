@@ -6,7 +6,7 @@
 #include <barrier>
 #include "../include/thread_safe_array.h"
 #include "../../lock/thread_safe_lock.h"
-
+using namespace std::chrono;
 constexpr size_t N = 1'000'000;
 constexpr size_t THREADS = 8;
 
@@ -40,6 +40,46 @@ void test_read(ArrayType& arr, size_t n, size_t threads) {
 }
 
 int main() {
+
+	StripedThreadSafeArray<size_t> arr4;
+	auto t1s = high_resolution_clock::now();
+	test_push_back(arr4, N, THREADS);
+	auto t2s = high_resolution_clock::now();
+	test_read(arr4, N, THREADS);
+	auto t3s = high_resolution_clock::now();
+	std::cout << "StripedThreadSafeArray push_back:   " << duration_cast<milliseconds>(t2s-t1s).count() << " ms\n";
+	std::cout << "StripedThreadSafeArray read:        " << duration_cast<milliseconds>(t3s-t2s).count() << " ms\n";
+	// 0b. std::vector 多线程push_back（加全局锁保证安全）
+	std::vector<size_t> stdvec_mt;
+	std::mutex stdvec_mutex;
+	auto t0mt = high_resolution_clock::now();
+	std::barrier sync_mt(THREADS);
+	auto worker_mt = [&](size_t tid) {
+		sync_mt.arrive_and_wait();
+		for (size_t i = tid * N / THREADS; i < (tid + 1) * N / THREADS; ++i) {
+			std::lock_guard<std::mutex> lock(stdvec_mutex);
+			stdvec_mt.push_back(i);
+		}
+	};
+	std::vector<std::thread> ts_mt;
+	for (size_t t = 0; t < THREADS; ++t) ts_mt.emplace_back(worker_mt, t);
+	for (auto& th : ts_mt) th.join();
+	auto t1mt = high_resolution_clock::now();
+	size_t sum_mt = 0;
+	for (size_t i = 0; i < stdvec_mt.size(); ++i) sum_mt += stdvec_mt[i];
+	auto t2mt = high_resolution_clock::now();
+	std::cout << "std::vector (multi-thread, global lock) push_back: " << duration_cast<milliseconds>(t1mt-t0mt).count() << " ms\n";
+	std::cout << "std::vector (multi-thread) read:      " << duration_cast<milliseconds>(t2mt-t1mt).count() << " ms\n";
+	// 0. std::vector 单线程性能对比
+	std::vector<size_t> stdvec;
+	auto t0 = high_resolution_clock::now();
+	for (size_t i = 0; i < N; ++i) stdvec.push_back(i);
+	auto t1v = high_resolution_clock::now();
+	size_t sum = 0;
+	for (size_t i = 0; i < N; ++i) sum += stdvec[i];
+	auto t2v = high_resolution_clock::now();
+	std::cout << "std::vector push_back:       " << duration_cast<milliseconds>(t1v-t0).count() << " ms\n";
+	std::cout << "std::vector read:            " << duration_cast<milliseconds>(t2v-t1v).count() << " ms\n";
 	using namespace std::chrono;
 	std::cout << "==== ThreadSafeArray 性能测试 ====" << std::endl;
 

@@ -27,6 +27,8 @@ private:
     mutable std::vector<std::atomic<size_t>> stripe_sizes_;
     
 public:
+    using DefaultStripedLock = StripedSharedMutex<64, SpinSharedMutex>;
+
     StripedThreadSafeArray() 
         : data_(lock_.stripes()), stripe_sizes_(lock_.stripes()) {
         for (auto& size : stripe_sizes_) {
